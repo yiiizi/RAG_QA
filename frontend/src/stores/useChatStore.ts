@@ -5,6 +5,9 @@ interface ChatState {
   conversations: Conversation[];
   activeId: string | null;
   streaming: boolean;
+  historyVisible: boolean;
+  sourceVisible: boolean;
+  sidebarCollapsed: boolean;
   // actions
   setActive: (id: string) => void;
   newConversation: () => string;
@@ -13,6 +16,9 @@ interface ChatState {
   updateLastSources: (convId: string, sources: ChatMessage['sources']) => void;
   updateLastMeta: (convId: string, meta: { intent?: string; latency_ms?: number }) => void;
   setStreaming: (v: boolean) => void;
+  setHistoryVisible: (v: boolean) => void;
+  setSourceVisible: (v: boolean) => void;
+  setSidebarCollapsed: (v: boolean) => void;
   deleteConversation: (id: string) => void;
 }
 
@@ -26,6 +32,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   conversations: [],
   activeId: null,
   streaming: false,
+  historyVisible: true,
+  sourceVisible: true,
+  sidebarCollapsed: false,
 
   setActive: (id) => set({ activeId: id }),
 
@@ -97,6 +106,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })),
 
   setStreaming: (v) => set({ streaming: v }),
+  setHistoryVisible: (v) => set({ historyVisible: v }),
+  setSourceVisible: (v) => set({ sourceVisible: v }),
+  setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
   deleteConversation: (id) =>
     set((s) => ({

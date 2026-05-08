@@ -3,11 +3,7 @@ import { PlusOutlined, DeleteOutlined, MessageOutlined } from '@ant-design/icons
 import { useChatStore } from '@/stores/useChatStore';
 import dayjs from 'dayjs';
 
-interface Props {
-  onCollapse?: () => void;
-}
-
-export default function ChatHistory({ onCollapse }: Props) {
+export default function ChatHistory() {
   const { conversations, activeId, setActive, newConversation, deleteConversation } = useChatStore();
 
   const isEmpty = (conv: typeof conversations[0]) =>
@@ -24,7 +20,7 @@ export default function ChatHistory({ onCollapse }: Props) {
         backdropFilter: 'blur(8px)',
       }}
     >
-      <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ padding: '8px 12px' }}>
         <Button
           type="primary"
           block
@@ -34,16 +30,6 @@ export default function ChatHistory({ onCollapse }: Props) {
         >
           新对话
         </Button>
-        {onCollapse && (
-          <Button
-            type="text"
-            size="small"
-            icon={<MessageOutlined />}
-            onClick={onCollapse}
-            title="收起"
-            style={{ width: 28, minWidth: 28, height: 28, borderRadius: 6, color: 'var(--text-muted)' }}
-          />
-        )}
       </div>
 
       <div style={{ padding: '0 12px 12px' }}>

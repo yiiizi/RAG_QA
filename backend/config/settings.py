@@ -118,5 +118,8 @@ class Settings(BaseSettings):
     # ── FAQ ───────────────────────────────────────────────────────
     FAQ_CACHE_MAX_SIZE: int = 10_000      # max cached FAQ entries in Redis
 
+    # ── Web Search (Tavily) ───────────────────────────────────────
+    TAVILY_API_KEY: str = ""
+
 
 settings = Settings()

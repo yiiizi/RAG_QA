@@ -26,7 +26,7 @@ export default function DashboardPage() {
   if (!stats) return null;
 
   return (
-    <div>
+    <div style={{ padding: 24 }}>
       <h2 style={{ marginBottom: 24 }}>数据大盘</h2>
 
       <StatCards stats={stats} />

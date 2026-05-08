@@ -1,14 +1,19 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Input, Button } from 'antd';
-import { SendOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { SendOutlined, DatabaseOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useChatStore } from '@/stores/useChatStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import type { SourceItem } from '@/types/chat';
 import { v4 as uuidv4 } from './uuid';
 
-export default function ChatInput() {
+interface ChatInputProps {
+  sendRef?: React.MutableRefObject<((text: string) => void) | null>;
+}
+
+export default function ChatInput({ sendRef }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [kbOnly, setKbOnly] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
   const { activeId, streaming, setStreaming, addMessage, appendToLast, updateLastSources, updateLastMeta, newConversation } =
     useChatStore();
   const inputRef = useRef<any>(null);
@@ -45,8 +50,8 @@ export default function ChatInput() {
 
   const { connect, send } = useWebSocket(handleMessage);
 
-  const doSend = useCallback(() => {
-    const text = value.trim();
+  const doSend = useCallback((textOverride?: string) => {
+    const text = (textOverride ?? value).trim();
     if (!text || streaming) return;
 
     let convId = activeId;
@@ -62,7 +67,6 @@ export default function ChatInput() {
     };
     addMessage(convId, userMsg);
 
-    // Placeholder for assistant response
     const assistantMsg = {
       id: uuidv4(),
       role: 'assistant' as const,
@@ -76,52 +80,95 @@ export default function ChatInput() {
     setValue('');
     inputRef.current?.focus();
 
-    // Connect if needed; message is queued if WS not yet open
     connect();
-    send({ query: text, kb_only: kbOnly });
-  }, [value, streaming, activeId, addMessage, setStreaming, newConversation, connect, send]);
+    send({ query: text, kb_only: kbOnly, web_search: webSearch });
+  }, [value, streaming, activeId, addMessage, setStreaming, newConversation, connect, send, kbOnly, webSearch]);
+
+  // Expose doSend to parent via ref
+  useEffect(() => {
+    if (sendRef) {
+      sendRef.current = (text: string) => {
+        setValue('');
+        // Directly send with the given text
+        let convId = activeId;
+        if (!convId) convId = newConversation();
+        const userMsg = { id: uuidv4(), role: 'user' as const, content: text, timestamp: new Date().toISOString() };
+        addMessage(convId, userMsg);
+        const assistantMsg = { id: uuidv4(), role: 'assistant' as const, content: '', sources: [] as SourceItem[], timestamp: new Date().toISOString() };
+        addMessage(convId, assistantMsg);
+        setStreaming(true);
+        connect();
+        send({ query: text, kb_only: kbOnly, web_search: webSearch });
+      };
+    }
+  });
 
   return (
-    <div style={{ padding: '0 0 20px', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ position: 'relative', width: '50%', minWidth: 320 }}>
+    <div style={{ padding: '0 0 16px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+      <div style={{ position: 'relative', width: '56%', minWidth: 360, maxWidth: 680 }}>
         <Input.TextArea
           ref={inputRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="输入你的问题... (Shift+Enter 换行，Enter 发送)"
-          autoSize={{ minRows: 3, maxRows: 6 }}
+          autoSize={{ minRows: 2, maxRows: 4 }}
           onPressEnter={(e) => { if (!e.shiftKey) { e.preventDefault(); doSend(); } }}
           disabled={streaming}
-          style={{ borderRadius: 12, padding: '10px 52px 36px 14px', fontSize: 14, lineHeight: 1.8 }}
+          style={{ borderRadius: 12, padding: '10px 52px 36px 14px', fontSize: 14, lineHeight: 1.8, resize: 'none' }}
         />
         {/* KB-only toggle */}
-        <Button
-          type="text"
-          icon={<DatabaseOutlined />}
-          onClick={() => setKbOnly(!kbOnly)}
-          title={kbOnly ? '知识库模式已开启' : '点击开启知识库模式'}
+        <span
+          onClick={(e) => { e.stopPropagation(); setKbOnly(!kbOnly); }}
           style={{
             position: 'absolute',
             left: 8,
             bottom: 8,
-            width: 28,
+            zIndex: 5,
             height: 28,
-            minWidth: 28,
             borderRadius: 6,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            color: kbOnly ? 'var(--accent)' : 'var(--text-muted)',
-            background: 'transparent',
-            fontSize: 14,
+            gap: 4,
+            padding: '0 8px',
+            cursor: 'pointer',
+            color: kbOnly ? '#69b1ff' : 'var(--text-muted)',
+            fontSize: 12,
             transition: 'color 0.2s',
+            userSelect: 'none',
           }}
-        />
+        >
+          <DatabaseOutlined style={{ fontSize: 14 }} />
+          <span>知识库</span>
+        </span>
+        {/* Web search toggle */}
+        <span
+          onClick={(e) => { e.stopPropagation(); setWebSearch(!webSearch); }}
+          style={{
+            position: 'absolute',
+            left: 82,
+            bottom: 8,
+            zIndex: 5,
+            height: 28,
+            borderRadius: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '0 8px',
+            cursor: 'pointer',
+            color: webSearch ? '#ffa940' : 'var(--text-muted)',
+            fontSize: 12,
+            transition: 'color 0.2s',
+            userSelect: 'none',
+          }}
+        >
+          <GlobalOutlined style={{ fontSize: 14 }} />
+          <span>联网</span>
+        </span>
         {/* Send button */}
         <Button
           type="primary"
           icon={<SendOutlined style={{ fontSize: 18 }} />}
-          onClick={doSend}
+          onClick={() => doSend()}
           loading={streaming}
           style={{
             position: 'absolute',

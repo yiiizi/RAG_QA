@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=4096, description="User question")
+    kb_only: bool = Field(False, description="Knowledge-base only mode")
+    web_search: bool = Field(False, description="Enable web search augmentation")
 
 
 class ChatResponse(BaseModel):

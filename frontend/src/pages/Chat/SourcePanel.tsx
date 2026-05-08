@@ -1,59 +1,38 @@
-import { Button, List, Tag, Typography } from 'antd';
-import { FileTextOutlined } from '@ant-design/icons';
+import { List, Tag, Typography } from 'antd';
 import { useChatStore } from '@/stores/useChatStore';
 import { formatPercent } from '@/utils/format';
 import EmptyState from '@/components/EmptyState';
 
 const BOX_HEIGHT = 150;
 
-interface Props {
-  onCollapse?: () => void;
-}
-
-export default function SourcePanel({ onCollapse }: Props) {
+export default function SourcePanel() {
   const { conversations, activeId } = useChatStore();
   const conv = conversations.find((c) => c.id === activeId);
 
   const lastAssistant = conv?.messages.filter((m) => m.role === 'assistant').at(-1);
   const sources = lastAssistant?.sources ?? [];
+  const hasAnswer = !!(lastAssistant?.content && lastAssistant.content.trim());
 
   if (sources.length === 0) {
     return (
-      <div
-        style={{
-          width: 280,
-          borderLeft: '1px solid var(--border-subtle)',
-          background: 'var(--sidebar-panel-bg)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {onCollapse && (
-          <Button type="text" size="small" icon={<FileTextOutlined />} onClick={onCollapse}
-            title="收起" style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, color: 'var(--text-muted)', width: 28, minWidth: 28, borderRadius: 6 }} />
-        )}
-        <EmptyState description="检索来源将在这里显示" />
+      <div style={{
+        width: 310, flexShrink: 0,
+        borderLeft: '1px solid var(--border-subtle)',
+        background: 'var(--sidebar-panel-bg)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <EmptyState description={hasAnswer ? '知识库中未找到相关信息' : '检索来源将在这里显示'} />
       </div>
     );
   }
 
   return (
     <div style={{
-      width: 280, position: 'relative',
+      width: 310, flexShrink: 0,
       borderLeft: '1px solid var(--border-subtle)',
       background: 'var(--sidebar-panel-bg)',
-      overflow: 'auto',
-      padding: 16,
+      overflow: 'auto', padding: 16,
     }}>
-      {onCollapse && (
-        <Button type="text" size="small" icon={<FileTextOutlined />} onClick={onCollapse}
-          title="收起" style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, color: 'var(--text-muted)', width: 28, minWidth: 28, borderRadius: 6 }} />
-      )}
-      <Typography.Title level={5} style={{ margin: '0 0 12px' }}>
-        <FileTextOutlined /> 引用来源
-      </Typography.Title>
-
       <List
         dataSource={sources}
         renderItem={(item, idx) => (

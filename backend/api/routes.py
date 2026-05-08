@@ -78,7 +78,7 @@ KB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 async def chat(req: ChatRequest):
     """Non-streaming Q&A."""
     try:
-        result = await ask(req.query)
+        result = await ask(req.query, kb_only=req.kb_only, web_search=req.web_search)
         return ChatResponse(
             answer=result.answer,
             intent=result.intent,
@@ -103,12 +103,13 @@ async def ws_chat(ws: WebSocket):
             data = json.loads(raw)
             query = data.get("query", "").strip()
             kb_only = data.get("kb_only", False)
+            web_search = data.get("web_search", False)
             if not query:
                 await ws.send_json({"type": "error", "data": "Empty query"})
                 continue
 
             try:
-                async for chunk in ask_stream(query, kb_only=kb_only):
+                async for chunk in ask_stream(query, kb_only=kb_only, web_search=web_search):
                     await ws.send_json(chunk)
                 await ws.send_json({"type": "finish", "data": {}})
             except Exception as e:

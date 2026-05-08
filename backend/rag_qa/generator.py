@@ -68,11 +68,11 @@ async def generate(
     str
         The LLM reply text.
     """
-    if intent == "chat" or not contexts:
-        system, user = _build_chat_prompt(query)
-    else:
+    if contexts:
         joined = "\n\n---\n\n".join(ctx["text"] for ctx in contexts)
         system, user = _build_knowledge_qa_prompt(query, joined)
+    else:
+        system, user = _build_chat_prompt(query)
 
     async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT) as client:
         resp = await client.post(
@@ -110,11 +110,11 @@ async def generate_stream(
 
     Yields content deltas (str). Call from a WebSocket endpoint.
     """
-    if intent == "chat" or not contexts:
-        system, user = _build_chat_prompt(query)
-    else:
+    if contexts:
         joined = "\n\n---\n\n".join(ctx["text"] for ctx in contexts)
         system, user = _build_knowledge_qa_prompt(query, joined)
+    else:
+        system, user = _build_chat_prompt(query)
 
     async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT) as client:
         async with client.stream(

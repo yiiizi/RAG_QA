@@ -74,7 +74,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 720, padding: 24 }}>
       <h2 className="page-heading">系统设置</h2>
 
       <Form form={form} layout="vertical">

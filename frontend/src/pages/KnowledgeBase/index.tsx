@@ -13,7 +13,7 @@ export default function KnowledgeBasePage() {
   }, [fetchList, fetchStats]);
 
   return (
-    <div>
+    <div style={{ padding: 24 }}>
       <h2 style={{ marginBottom: 16 }}>知识库管理</h2>
       <Tabs
         defaultActiveKey="list"

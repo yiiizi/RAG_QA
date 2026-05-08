@@ -2,12 +2,14 @@ export const INTENT_LABELS: Record<string, string> = {
   chat: '闲聊',
   faq: '高频问答',
   knowledge_qa: '知识问答',
+  联网搜索: '联网搜索',
 };
 
 export const INTENT_COLORS: Record<string, string> = {
   chat: '#52c41a',
   faq: '#1890ff',
   knowledge_qa: '#fa8c16',
+  联网搜索: '#ffa940',
 };
 
 export const FILE_TYPE_ICONS: Record<string, string> = {

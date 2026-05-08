@@ -15,6 +15,7 @@ from rag_qa.generator import generate, generate_stream
 from rag_qa.intent_recognizer import recognize
 from rag_qa.retriever import retrieve
 from rag_qa.strategy_selector import StrategyResult, selector
+from rag_qa.web_search import web_search as do_web_search
 
 logger = logging.getLogger(__name__)
 
@@ -81,17 +82,59 @@ selector.register("knowledge_qa", _strategy_knowledge_qa)
 
 # ── Public API ────────────────────────────────────────────────────
 
-async def ask(query: str, kb_only: bool = False) -> StrategyResult:
+async def ask(query: str, kb_only: bool = False, web_search: bool = False) -> StrategyResult:
     """
     Ask a question through the full RAG pipeline.
 
     Returns StrategyResult with answer, sources, latency, metadata.
     """
+    import time
+    start = time.perf_counter()
+
+    if kb_only:
+        sources = retrieve(query)
+        if not sources:
+            answer = "知识库中未找到相关内容，请尝试换个问题或上传相关文档。"
+        else:
+            answer = await generate(query, contexts=sources, intent="knowledge_qa")
+        elapsed = int((time.perf_counter() - start) * 1000)
+        return StrategyResult(
+            strategy_name="knowledge_qa", intent="knowledge_qa",
+            answer=answer, sources=sources, latency_ms=elapsed,
+            metadata={"kb_only": True},
+        )
+
     # 1. Intent recognition
     intent, confidence = await recognize(query)
 
-    # 2. Route through strategy selector
-    result = await selector.route(intent, query, extra={"kb_only": kb_only})
+    # 2. If web_search, fetch web results and augment with KB context
+    if web_search:
+        import asyncio
+        web_results, kb_results = await asyncio.gather(
+            do_web_search(query),
+            asyncio.to_thread(retrieve, query),
+        )
+        if web_results or kb_results:
+            # Combine: web results as additional context
+            combined = list(kb_results)
+            for wr in web_results:
+                combined.append({
+                    "text": wr["text"],
+                    "source": wr.get("source", "互联网"),
+                    "score": 0,
+                    "parent_id": "",
+                    "chunk_index": -1,
+                })
+            answer = await generate(query, contexts=combined, intent="knowledge_qa")
+            elapsed = int((time.perf_counter() - start) * 1000)
+            return StrategyResult(
+                strategy_name="web_search", intent="联网搜索",
+                answer=answer, sources=combined, latency_ms=elapsed,
+                metadata={"web_search": True},
+            )
+
+    # 3. Route through strategy selector
+    result = await selector.route(intent, query, extra={"kb_only": False})
 
     # 3. Async logging (fire and forget)
     try:
@@ -115,7 +158,7 @@ async def ask(query: str, kb_only: bool = False) -> StrategyResult:
     return result
 
 
-async def ask_stream(query: str, kb_only: bool = False):
+async def ask_stream(query: str, kb_only: bool = False, web_search: bool = False):
     """
     Streaming version — yields chunks.
 
@@ -125,21 +168,41 @@ async def ask_stream(query: str, kb_only: bool = False):
         {"type": "done", "data": {...}}         # final: metadata
     """
     if kb_only:
-        # KB-only mode: skip intent, skip FAQ cache, go straight to retrieval
         sources = retrieve(query)
-        if not sources:
-            yield {"type": "sources", "data": []}
-            yield {"type": "token", "data": "知识库中未找到相关内容，请尝试换个问题或上传相关文档。"}
-            yield {"type": "done", "data": {"intent": "knowledge_qa", "kb_only": True}}
-            return
-        stream = generate_stream(query, contexts=sources, intent="knowledge_qa")
         yield {"type": "sources", "data": sources}
-        async for token in stream:
-            yield {"type": "token", "data": token}
+        if not sources:
+            yield {"type": "token", "data": "知识库中未找到相关内容，请尝试换个问题或上传相关文档。"}
+        else:
+            stream = generate_stream(query, contexts=sources, intent="knowledge_qa")
+            async for token in stream:
+                yield {"type": "token", "data": token}
         yield {"type": "done", "data": {"intent": "knowledge_qa", "kb_only": True}}
         return
 
     intent, confidence = await recognize(query)
+
+    # Web search augmentation
+    if web_search:
+        import asyncio
+        web_results, kb_results = await asyncio.gather(
+            do_web_search(query),
+            asyncio.to_thread(retrieve, query),
+        )
+        combined = list(kb_results)
+        for wr in web_results:
+            combined.append({
+                "text": wr["text"],
+                "source": wr.get("source", "互联网"),
+                "score": 0,
+                "parent_id": "",
+                "chunk_index": -1,
+            })
+        yield {"type": "sources", "data": combined}
+        stream = generate_stream(query, contexts=combined, intent="knowledge_qa")
+        async for token in stream:
+            yield {"type": "token", "data": token}
+        yield {"type": "done", "data": {"intent": "联网搜索", "web_search": True}}
+        return
 
     if intent == "chat":
         sources = []
