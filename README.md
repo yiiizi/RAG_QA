@@ -1,6 +1,6 @@
 # RAG 智能问答系统
 
-基于 Milvus + BGE-M3 + DeepSeek 的企业级 RAG（检索增强生成）系统，支持多格式文档知识库、混合检索、联网搜索、流式问答和可视化数据大盘。
+基于 LlamaIndex + Milvus + BGE-M3 + DeepSeek 的企业级 RAG（检索增强生成）系统，支持多格式文档知识库、混合检索、联网搜索、流式问答和可视化数据大盘。
 
 ## 技术架构
 
@@ -16,6 +16,7 @@
 ├─────────────────────────────────────────────────────┤
 │  Milvus 向量库  │  MySQL  │  Redis  │  BGE-M3 嵌入   │
 │  BM25 稀疏检索  │  FAQ 存储 │ 热缓存  │  Tavily 联网   │
+│  LlamaIndex 分块 │         │         │  BGE-Reranker  │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -139,9 +140,9 @@ RAG/
 │   │   ├── retriever.py   # 混合检索
 │   │   ├── generator.py   # LLM 生成
 │   │   └── web_search.py  # Tavily 联网搜索
-│   ├── offline_kb/        # 离线知识库
+│   ├── offline_kb/        # 离线知识库（LlamaIndex）
 │   │   ├── loaders/       # 多格式文件加载器
-│   │   ├── chunker.py     # 父子分块
+│   │   ├── chunker.py     # 父子分块（SentenceSplitter）
 │   │   ├── vectorizer.py  # 批量向量化
 │   │   └── indexer.py     # 索引编排
 │   ├── api/
