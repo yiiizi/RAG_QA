@@ -1,21 +1,21 @@
 # RAG 智能问答系统
 
-基于 LlamaIndex + Milvus + BGE-M3 的企业级 RAG（检索增强生成）系统，支持多格式文档知识库、混合检索、流式问答和可视化数据大盘。
+基于 Milvus + BGE-M3 + DeepSeek 的企业级 RAG（检索增强生成）系统，支持多格式文档知识库、混合检索、联网搜索、流式问答和可视化数据大盘。
 
 ## 技术架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                   React 18 + Ant Design 5            │
-│              流式对话 / 知识库管理 / 数据大盘           │
+│         流式对话 / 知识库管理 / FAQ / 数据大盘          │
 └────────────────────────┬────────────────────────────┘
                          │ WebSocket + REST API
 ┌────────────────────────▼────────────────────────────┐
 │                   FastAPI (Python)                    │
-│          意图识别 → 策略路由 → 检索 → 生成             │
+│        意图识别 → 策略路由 → 检索 → 联网搜索 → 生成     │
 ├─────────────────────────────────────────────────────┤
 │  Milvus 向量库  │  MySQL  │  Redis  │  BGE-M3 嵌入   │
-│  BM25 稀疏检索  │  FAQ 存储 │ 热缓存  │  BGE-Reranker  │
+│  BM25 稀疏检索  │  FAQ 存储 │ 热缓存  │  Tavily 联网   │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -25,7 +25,8 @@
 - **流式输出**：WebSocket 实时推送，打字机效果
 - **意图识别**：闲聊 / 高频 FAQ / 知识检索 自动分流
 - **混合检索**：Milvus 稠密向量 + BM25 稀疏检索 → RRF 融合
-- **知识库模式**：一键切换为纯知识库检索，不依赖 LLM 自有知识
+- **知识库模式**：一键切换为纯知识库检索，LLM 总结检索内容
+- **联网搜索**：集成 Tavily API，实时搜索互联网信息增强回答
 - **引用溯源**：每条回答标注检索来源和相似度分数
 - **DeepSeek 驱动**：使用 DeepSeek 大模型生成回答
 
@@ -40,8 +41,13 @@
 - 响应延迟监控 / 缓存命中率
 - 知识库存储统计
 
-### 主题系统
-- 深色 / 浅色双主题，一键切换，自动持久化
+### 界面设计
+- **三栏布局**：左侧对话历史 + 中间聊天区 + 右侧引用来源
+- **顶部导航栏**：对话历史 / 知识库管理 / FAQ / 数据大盘 / 系统设置
+- **弹窗式功能页**：知识库、FAQ、数据大盘、系统设置以弹窗形式打开
+- **欢迎屏幕**：新对话时展示系统介绍和推荐问题
+- **思考动画**：AI 思考时显示弹跳圆点动画
+- **深色 / 浅色双主题**：一键切换，自动持久化
 
 ## 快速开始
 
@@ -78,6 +84,7 @@ pip install torch FlagEmbedding -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 编辑 config/.env 配置数据库和 API Key
 # MYSQL_PASSWORD=你的密码
 # LLM_API_KEY=你的DeepSeek_API_Key
+# TAVILY_API_KEY=你的Tavily_API_Key（联网搜索功能，可选）
 
 # 启动
 python main.py
@@ -96,8 +103,18 @@ npm run dev
 ### 4. 使用
 
 1. 打开 `http://localhost:5173`
-2. 进入「知识库管理」→ 上传文档（如 PDF）
-3. 进入「智能问答」→ 提问，系统自动从知识库检索并生成回答
+2. 点击顶部导航栏「知识库管理」→ 上传文档（如 PDF）
+3. 在聊天框输入问题，系统自动从知识库检索并生成回答
+4. 可开启「知识库模式」或「联网搜索」切换回答方式
+
+## 回答模式
+
+| 模式 | 触发方式 | 说明 |
+|------|---------|------|
+| 普通问答 | 不开启任何开关 | 意图识别自动路由：闲聊/FAQ/知识问答 |
+| 知识库模式 | 点击「知识库」按钮 | 强制走知识库检索，LLM 总结检索内容 |
+| 联网搜索 | 点击「联网」按钮 | Tavily 联网搜索 + 知识库检索，合并后 LLM 生成 |
+| 知识库+联网 | 同时开启两个按钮 | 两种来源同时生效 |
 
 ## 项目结构
 
@@ -120,7 +137,8 @@ RAG/
 │   │   ├── milvus_store.py # Milvus 操作
 │   │   ├── reranker.py    # BGE-Reranker
 │   │   ├── retriever.py   # 混合检索
-│   │   └── generator.py   # LLM 生成
+│   │   ├── generator.py   # LLM 生成
+│   │   └── web_search.py  # Tavily 联网搜索
 │   ├── offline_kb/        # 离线知识库
 │   │   ├── loaders/       # 多格式文件加载器
 │   │   ├── chunker.py     # 父子分块
@@ -134,15 +152,14 @@ RAG/
 ├── frontend/
 │   └── src/
 │       ├── pages/
-│       │   ├── Chat/          # 智能问答
-│       │   ├── KnowledgeBase/ # 知识库管理
-│       │   ├── FAQ/           # FAQ 管理
-│       │   ├── Dashboard/     # 数据大盘
-│       │   └── Settings/      # 系统设置
+│       │   ├── Chat/          # 智能问答（主页面）
+│       │   ├── KnowledgeBase/ # 知识库管理（弹窗）
+│       │   ├── FAQ/           # FAQ 管理（弹窗）
+│       │   ├── Dashboard/     # 数据大盘（弹窗）
+│       │   └── Settings/      # 系统设置（弹窗）
 │       ├── stores/        # Zustand 状态管理
-│       ├── services/      # API 请求层
-│       ├── hooks/         # WebSocket / 轮询
-│       ├── layouts/       # 布局组件
+│       ├── hooks/         # WebSocket
+│       ├── layouts/       # 布局组件（MainLayout）
 │       └── components/    # 公共组件
 │
 └── README.md
@@ -153,7 +170,7 @@ RAG/
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/chat` | 非流式问答 |
-| WS | `/api/ws/chat` | WebSocket 流式问答 |
+| WS | `/ws/chat` | WebSocket 流式问答 |
 | POST | `/api/kb/upload` | 上传文档 |
 | GET | `/api/kb/list` | 文档列表 |
 | GET | `/api/kb/stats` | 知识库统计 |
@@ -161,7 +178,7 @@ RAG/
 | DELETE | `/api/kb/{file}` | 删除文档 |
 | CRUD | `/api/faq` | FAQ 管理 |
 | GET | `/api/dashboard` | 数据大盘 |
-| GET | `/api/settings` | 系统设置 |
+| GET/PUT | `/api/settings` | 系统设置 |
 
 ## 配置说明
 
@@ -184,7 +201,10 @@ REDIS_URL=redis://127.0.0.1:6379/0
 # DeepSeek LLM
 LLM_API_BASE=https://api.deepseek.com
 LLM_API_KEY=sk-your-api-key
-LLM_MODEL=deepseek-chat
+LLM_MODEL=deepseek-v4-pro
+
+# Tavily 联网搜索（可选）
+TAVILY_API_KEY=tvly-your-api-key
 ```
 
 ## 父子分块策略
@@ -208,3 +228,6 @@ PDF 文档
 
 **Q: 上传文档提示超时？**
 模型首次加载需要初始化，启动后等待 30 秒再上传。
+
+**Q: 联网搜索不生效？**
+需要在 `backend/config/.env` 中配置 `TAVILY_API_KEY`，可在 https://tavily.com 免费注册获取。
